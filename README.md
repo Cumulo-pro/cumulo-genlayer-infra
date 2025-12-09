@@ -2,6 +2,21 @@
 
 This FAQ compiles the most common doubts when running a **GenLayer Asimov Testnet validator**.
 
+## 📚 Documentation Index
+
+- **Staking Guide**  
+  How to stake, deposit, prime epochs, and manage validator status.  
+  👉 https://github.com/Cumulo-pro/cumulo-genlayer-infra/blob/main/genlayer_staking_guide.md
+
+- **Key Management**  
+  Backup, export, restore, and rotate Owner/Operator keys safely.  
+  👉 https://github.com/Cumulo-pro/cumulo-genlayer-infra/blob/main/genlayer-key-management.md
+
+- **Validator FAQ**  
+  Quick answers on config, errors, systemd, monitoring, and troubleshooting.  
+  👉 https://github.com/Cumulo-pro/cumulo-genlayer-infra/blob/main/faq
+
+
 ---
 
 ## 1. Wallets & Roles
