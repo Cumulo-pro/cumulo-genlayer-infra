@@ -17,7 +17,7 @@ This FAQ compiles the most common doubts when running a **GenLayer Asimov Testne
   👉 https://github.com/Cumulo-pro/cumulo-genlayer-infra/blob/main/faq
 
 - **Metrics & Monitoring Guide**  
-  Full breakdown of /health and /metrics endpoints, including Prometheus metrics exposed by the node, recommended Grafana dashboards, limitations, and how to integrate with monitoring systems.
+  Full breakdown of /health and /metrics endpoints, including Prometheus metrics exposed by the node, recommended Grafana dashboards, limitations, and how to integrate with monitoring systems.  
   👉 https://github.com/Cumulo-pro/cumulo-genlayer-infra/blob/main/genlayer_metrics_doc.md
 ---
 
