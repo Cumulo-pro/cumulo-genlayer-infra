@@ -62,15 +62,6 @@ The goal is to provide a **transparent, reproducible, and well-documented valida
 
 ---
 
-## 🛠️ What This Repo Does *Not* Contain
-
-- No private keys  
-- No confidential operator credentials  
-- No system-specific secrets  
-
-Only documentation, guides, and safe-to-share configuration examples.
-
----
 
 ## Upgrade History
 
