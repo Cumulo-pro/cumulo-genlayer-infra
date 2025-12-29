@@ -72,6 +72,16 @@ Only documentation, guides, and safe-to-share configuration examples.
 
 ---
 
+## Upgrade History
+
+| Version | Date       | Method    | Notes |
+|-------|------------|-----------|------|
+| v0.4.0 | 2025-12-05 | Fresh     | Initial setup |
+| v0.4.1 | 2025-12-19 | In-place  | Binary upgrade |
+| v0.4.2 | 2025-12-29 | In-place  | Telemetry env vars |
+
+---
+
 ## 🏢 About Cumulo
 
 Cumulo is a professional blockchain infrastructure operator running validators, RPC nodes, and DA infrastructure across modular ecosystems such as Celestia, Story, Starknet, Dymension, Avail, and now **GenLayer**.  
