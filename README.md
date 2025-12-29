@@ -45,6 +45,12 @@ Full breakdown of `/health` and `/metrics` endpoints, Prometheus metrics, monito
 
 ---
 
+## 🔄 Validator Upgrades
+
+- [Upgrade to v0.4.2 (Asimov Testnet)](upgrade-v0.4.2.md)
+
+---
+
 ## 🏗️ About This Repository
 
 This repository includes:
