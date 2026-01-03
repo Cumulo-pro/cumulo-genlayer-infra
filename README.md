@@ -41,7 +41,7 @@ Backup, export, restore, rotate Owner & Operator keys safely.
 
 ### **4️⃣ Validator FAQ**  
 Quick answers about configuration, systemd, troubleshooting, WebDriver, operator import, migration & recovery.  
-👉 https://github.com/Cumulo-pro/cumulo-genlayer-infra/blob/main/faq
+👉 [https://github.com/Cumulo-pro/cumulo-genlayer-infra/blob/main/faq](https://github.com/Cumulo-pro/cumulo-genlayer-infra/blob/main/faq.md)
 
 ---
 
