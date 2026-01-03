@@ -1,10 +1,8 @@
-# GenLayer Validator — Initial Installation Guide (Cumulo)
+# GenLayer Validator — Initial Installation Guide
 
 > **Target version:** v0.4.1  
 > **Network:** GenLayer Testnet (Asimov)  
-> **Maintained by:** Cumulo (https://cumulo.pro)
 
-This guide consolidates Cumulo’s operational experience and the latest GenLayer documentation into a **clean, reproducible, validator‑ready installation flow**.
 
 ---
 
