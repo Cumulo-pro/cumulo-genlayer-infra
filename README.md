@@ -21,25 +21,31 @@ Cumulo operates a fully configured validator node and maintains this repository 
 
 ## 📚 Documentation Index (Cumulo)
 
-### **1️⃣ Staking Guide**  
+### **1️⃣ Validator Installation Guide (GenLayer)**
+Step-by-step guide to install and run a GenLayer validator from scratch: system requirements, node setup, GenVM configuration, LLM (Heurist), WebDriver, systemd, and first sync.  
+👉 https://github.com/Cumulo-pro/cumulo-genlayer-infra/blob/main/genlayer-validator-installation-cumulo.md
+
+---
+
+### **2️⃣ Staking Guide**  
 How to stake, deposit more GEN, prime epochs, activate stake, exit, and claim withdrawals.  
 👉 https://github.com/Cumulo-pro/cumulo-genlayer-infra/blob/main/genlayer_staking_guide.md
 
 ---
 
-### **2️⃣ Key Management**  
+### **3️⃣ Key Management**  
 Backup, export, restore, rotate Owner & Operator keys safely.  
 👉 https://github.com/Cumulo-pro/cumulo-genlayer-infra/blob/main/genlayer-key-management.md
 
 ---
 
-### **3️⃣ Validator FAQ**  
+### **4️⃣ Validator FAQ**  
 Quick answers about configuration, systemd, troubleshooting, WebDriver, operator import, migration & recovery.  
 👉 https://github.com/Cumulo-pro/cumulo-genlayer-infra/blob/main/faq
 
 ---
 
-### **4️⃣ Metrics & Monitoring Guide**  
+### **5️⃣ Metrics & Monitoring Guide**  
 Full breakdown of `/health` and `/metrics` endpoints, Prometheus metrics, monitoring strategy, and limitations.  
 👉 https://github.com/Cumulo-pro/cumulo-genlayer-infra/blob/main/genlayer_metrics_doc.md  
 
