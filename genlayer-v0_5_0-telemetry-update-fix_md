@@ -1,0 +1,198 @@
+# GenLayer v0.5.0 — Telemetry (Alloy) Update Fix
+
+*Last updated: 2026-02-14 16:22:17 UTC*
+
+------------------------------------------------------------------------
+
+## Context
+
+After upgrading the GenLayer node, telemetry logs stopped appearing in
+Grafana Cloud (Loki), even though:
+
+-   `node.log` was still being generated
+-   Alloy container was running
+-   No explicit errors appeared in Docker logs
+
+This document explains the full diagnostic process and the corrective
+actions required to restore proper log forwarding.
+
+------------------------------------------------------------------------
+
+# 1. Initial Symptoms
+
+After the node upgrade:
+
+-   Logs were no longer visible in Grafana
+-   `node.log` existed on disk
+-   Alloy container was running normally
+-   Loki endpoint returned HTTP `204`
+-   `loki_write_sent_entries_total` was increasing
+
+However, logs were not queryable using the expected labels.
+
+------------------------------------------------------------------------
+
+# 2. Root Cause
+
+The validator `NODE_ID` changed during the upgrade.
+
+Before upgrade:
+
+    NODE_ID=0x0F67c2fa8bb42969CE34517d911efFC025bedF07
+
+After upgrade (real validator wallet detected via journal):
+
+    NODE_ID=0xD59D80E5cBCDA606975A7f6319B9f1919076AEE2
+
+The Alloy configuration uses `NODE_ID` as the `instance` label:
+
+``` river
+rule {
+  target_label = "instance"
+  replacement  = sys.env("NODE_ID")
+}
+```
+
+Because the label changed, Grafana queries were still filtering for the
+old instance.
+
+Additionally, old stream positions remained cached inside Alloy.
+
+------------------------------------------------------------------------
+
+# 3. Verification Steps
+
+## 3.1 Verify actual validator ID
+
+``` bash
+journalctl -u genlayernode -n 200 --no-pager | grep -m1 -E 'mode=validator|node=0x'
+```
+
+Example output:
+
+    mode=validator node=0xD59D80E5cBCDA606975A7f6319B9f1919076AEE2
+
+------------------------------------------------------------------------
+
+## 3.2 Verify Alloy environment variables
+
+``` bash
+docker exec -it genlayer-node-alloy sh -lc 'env | grep NODE_ID'
+```
+
+------------------------------------------------------------------------
+
+## 3.3 Verify Loki push status
+
+``` bash
+curl -s http://127.0.0.1:12345/metrics | grep loki_write
+```
+
+Look for:
+
+-   `status_code="204"`
+-   `loki_write_sent_entries_total`
+
+HTTP `204` confirms successful ingestion by Grafana Cloud.
+
+------------------------------------------------------------------------
+
+# 4. Corrective Actions
+
+## Step 1 --- Update `.env`
+
+Edit:
+
+    ~/genlayer-telemetry/.env
+
+Ensure correct values:
+
+``` env
+NODE_ID=0xD59D80E5cBCDA606975A7f6319B9f1919076AEE2
+VALIDATOR_NAME=Cumulo
+LOG_FILE_PATTERN=/var/log/genlayer/node.log
+```
+
+------------------------------------------------------------------------
+
+## Step 2 --- Recreate Alloy container
+
+``` bash
+docker compose up -d --force-recreate alloy
+```
+
+------------------------------------------------------------------------
+
+## Step 3 --- Clear old Loki stream positions
+
+Remove cached positions:
+
+``` bash
+docker exec -it genlayer-node-alloy sh -lc 'rm -f /var/lib/alloy/data/loki.source.file.genlayer/positions.yml'
+```
+
+Restart container:
+
+``` bash
+docker restart genlayer-node-alloy
+```
+
+------------------------------------------------------------------------
+
+## Step 4 --- Force a test log entry
+
+``` bash
+echo "GENLAYER_LOKI_TEST $(date -u +%FT%TZ)" | sudo tee -a /home/dedicaovh/genlayer-node-linux-amd64/data/node/logs/node.log
+```
+
+------------------------------------------------------------------------
+
+## Step 5 --- Confirm new stream labels
+
+``` bash
+docker exec -it genlayer-node-alloy sh -lc 'cat /var/lib/alloy/data/loki.source.file.genlayer/positions.yml'
+```
+
+Expected label structure:
+
+    labels: '{component="alloy", instance="0xD59D80E5...", job="genlayer-node", validator_name="Cumulo"}'
+
+------------------------------------------------------------------------
+
+# 5. Confirm Grafana Ingestion
+
+In Grafana Loki, query:
+
+    {validator_name="Cumulo"}
+
+or
+
+    {instance="0xD59D80E5cBCDA606975A7f6319B9f1919076AEE2"}
+
+Logs should now appear correctly.
+
+------------------------------------------------------------------------
+
+# 6. Final Working State
+
+-   Correct `NODE_ID`
+-   Alloy tailing `/var/log/genlayer/node.log`
+-   Loki returning HTTP `204`
+-   `loki_write_sent_entries_total` increasing
+-   Stream labels correctly attached
+-   Logs visible in Grafana
+
+------------------------------------------------------------------------
+
+# Important Lessons Learned
+
+1.  GenLayer upgrades may change the validator `node=0x...` identifier.
+2.  Alloy relies on environment variables for labeling.
+3.  Loki streams are label-based; changing labels creates new streams.
+4.  Always clear `positions.yml` when label configuration changes.
+5.  HTTP `204` does not guarantee logs are visible --- label mismatches
+    can hide streams.
+
+------------------------------------------------------------------------
+
+**Status: Fully Resolved**
