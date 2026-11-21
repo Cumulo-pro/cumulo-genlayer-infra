@@ -1,4 +1,4 @@
-# GenLayer Validator — Bradbury Installation Guide
+# GenLayer Validator: Bradbury Installation Guide
 
 ![Version](https://img.shields.io/badge/version-v0.5.5-blue)
 ![Network](https://img.shields.io/badge/network-Testnet%20Bradbury%20Phase%201-orange)
@@ -6,8 +6,6 @@
 ![Maintained by Cumulo](https://img.shields.io/badge/maintained%20by-Cumulo-purple)
 
 > Installation guide for running a GenLayer validator node on the **Bradbury Phase 1** testnet (v0.5.5).
-
----
 
 ## Table of Contents
 
@@ -31,8 +29,6 @@
 - [18. Operational Commands](#18-operational-commands)
 - [19. Notes](#19-notes)
 
----
-
 ## 1. System Requirements
 
 ### Minimum recommended hardware
@@ -41,13 +37,11 @@
 |-----------|-------------|
 | CPU | 8 cores / 16 threads |
 | RAM | 16 GB |
-| Disk | SSD / NVMe — **≥ 128 GB** |
+| Disk | SSD / NVMe, **≥ 128 GB** |
 | Network | 100 Mbps |
 | OS | Linux x86_64 (Ubuntu / Debian recommended) |
 
 > **Note:** No GPU is required unless you plan to run LLMs locally. This guide uses a hosted LLM provider.
-
----
 
 ## 2. Dependencies
 
@@ -65,8 +59,6 @@ Enable Docker:
 sudo systemctl enable docker
 sudo systemctl start docker
 ```
-
----
 
 ## 3. Node.js and GenLayer CLI
 
@@ -98,8 +90,6 @@ Verify:
 genlayer --version
 ```
 
----
-
 ## 4. Python 3.10 for GenVM Setup
 
 On Ubuntu 20.04, Python 3.8 is not sufficient for the current GenVM post-install scripts. Python 3.10 must be compiled manually.
@@ -128,8 +118,6 @@ Verify:
 /opt/python3.10/bin/python3.10 --version
 ```
 
----
-
 ## 5. Download GenLayer Node
 
 ### Download v0.5.5
@@ -151,8 +139,6 @@ Verify version:
 ```bash
 ./bin/genlayernode version
 ```
-
----
 
 ## 6. GenVM Setup
 
@@ -179,8 +165,6 @@ During this installation, three manual fixes were needed:
 3. **Update `create_venv.py`** at `third_party/genvm/lib/python/post-install/create_venv.py` to upgrade `pip`, `setuptools`, and `wheel` before installing dependencies.
 
 > These fixes apply to **Ubuntu 20.04** specifically and may not be needed on newer OS versions.
-
----
 
 ## 7. Node Configuration
 
@@ -227,8 +211,6 @@ node:
     port: 9153
 ```
 
----
-
 ## 8. Owner, Operator and Validator
 
 Bradbury uses a three-role model:
@@ -259,14 +241,12 @@ genlayer staking wizard --network testnet-bradbury
 | Operator | `0x9f1d7bf03c5bc11644bf4d5cce92cb9a6352f4ef` |
 | Stake | `101000gen` |
 
----
-
 ## 9. Import Operator Key into the Node
 
 The wizard exports the operator keystore to:
 
 ```
-/home/noditoovh/operator-keystore.json
+/home/USER/operator-keystore.json
 ```
 
 Import it into the node:
@@ -275,12 +255,10 @@ Import it into the node:
 ./bin/genlayernode account import \
   --password "YOUR_NODE_PASSWORD" \
   --passphrase "YOUR_KEYSTORE_PASSPHRASE" \
-  --path "/home/noditoovh/operator-keystore.json" \
+  --path "/home/USER/operator-keystore.json" \
   -c "$(pwd)/configs/node/config.yaml" \
   --setup
 ```
-
----
 
 ## 10. LLM Provider Configuration
 
@@ -311,8 +289,6 @@ Restrict permissions:
 chmod 600 ~/genlayer-bradbury/env/bradbury.env
 ```
 
----
-
 ## 11. Start WebDriver
 
 The WebDriver container is required by GenVM:
@@ -328,8 +304,6 @@ Expected container:
 genlayer-node-webdriver
 ```
 
----
-
 ## 12. Validate Configuration
 
 Run the full diagnostics check:
@@ -344,16 +318,12 @@ Expected output:
 All configuration checks passed!
 ```
 
----
-
 ## 13. Run Node Manually
 
 ```bash
 export HEURISTKEY="YOUR_HEURIST_API_KEY"
 ./bin/genlayernode run -c "$(pwd)/configs/node/config.yaml" --password "YOUR_NODE_PASSWORD"
 ```
-
----
 
 ## 14. Health Check
 
@@ -387,9 +357,7 @@ Pretty-printed output:
 curl -s http://127.0.0.1:9153/health | jq
 ```
 
-> **Note:** The node reports `status: down` while syncing — this is expected. Once synced, `validating.status` becomes `up`.
-
----
+> **Note:** The node reports `status: down` while syncing, this is expected. Once synced, `validating.status` becomes `up`.
 
 ## 15. Systemd Service
 
@@ -409,12 +377,12 @@ Wants=network-online.target
 Requires=docker.service
 
 [Service]
-User=noditoovh
-Group=noditoovh
-WorkingDirectory=/home/noditoovh/genlayer-bradbury/v0.5.5/genlayer-node-linux-amd64
-EnvironmentFile=/home/noditoovh/genlayer-bradbury/env/bradbury.env
-ExecStart=/home/noditoovh/genlayer-bradbury/v0.5.5/genlayer-node-linux-amd64/bin/genlayernode run \
-  -c /home/noditoovh/genlayer-bradbury/v0.5.5/genlayer-node-linux-amd64/configs/node/config.yaml \
+User=USER
+Group=USER
+WorkingDirectory=/home/USER/genlayer-bradbury/v0.5.5/genlayer-node-linux-amd64
+EnvironmentFile=/home/USER/genlayer-bradbury/env/bradbury.env
+ExecStart=/home/USER/genlayer-bradbury/v0.5.5/genlayer-node-linux-amd64/bin/genlayernode run \
+  -c /home/USER/genlayer-bradbury/v0.5.5/genlayer-node-linux-amd64/configs/node/config.yaml \
   --password YOUR_NODE_PASSWORD
 Restart=always
 RestartSec=5
@@ -446,8 +414,6 @@ Check status:
 sudo systemctl status genlayer-bradbury --no-pager -l
 ```
 
----
-
 ## 16. Validator Status
 
 ```bash
@@ -456,23 +422,19 @@ genlayer staking validator-info \
   --network testnet-bradbury
 ```
 
----
-
 ## 17. Important Paths
 
 | Resource | Path |
 |----------|------|
-| Node root | `/home/noditoovh/genlayer-bradbury/v0.5.5/genlayer-node-linux-amd64` |
+| Node root | `/home/USER/genlayer-bradbury/v0.5.5/genlayer-node-linux-amd64` |
 | Main binary | `.../bin/genlayernode` |
 | Main config | `.../configs/node/config.yaml` |
 | Data directory | `.../data/node` |
 | Logs | `.../data/node/logs` |
-| Owner keystore | `/home/noditoovh/.genlayer/keystores/owner.json` |
-| Operator keystore | `/home/noditoovh/operator-keystore.json` |
-| Env file | `/home/noditoovh/genlayer-bradbury/env/bradbury.env` |
+| Owner keystore | `/home/USER/.genlayer/keystores/owner.json` |
+| Operator keystore | `/home/USER/operator-keystore.json` |
+| Env file | `/home/USER/genlayer-bradbury/env/bradbury.env` |
 | Systemd service | `/etc/systemd/system/genlayer-bradbury.service` |
-
----
 
 ## 18. Operational Commands
 
@@ -509,16 +471,12 @@ journalctl -u genlayer-bradbury -f
 journalctl -u genlayer-bradbury -n 100 --no-pager
 ```
 
----
-
 ## 19. Notes
 
 - Bradbury and Asimov share the **same owner wallet** in this setup.
 - Bradbury requires a **new operator** and a **new validator wallet**.
-- The node reports `status: down` while syncing — this is normal behaviour.
+- The node reports `status: down` while syncing, this is normal behaviour.
 - Once synced, `validating.status` transitions to `up`.
 - This installation was completed successfully on **Ubuntu 20.04.6 LTS**.
 
----
-
-*Maintained by **[Cumulo](https://cumulo.pro)** — Infrastructure, monitoring, and validator tooling for GenLayer and beyond.*
+*Maintained by **[Cumulo](https://cumulo.pro)**, Infrastructure, monitoring, and validator tooling for GenLayer and beyond.*
