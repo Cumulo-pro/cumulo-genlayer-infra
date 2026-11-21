@@ -1,4 +1,4 @@
-# GenLayer v0.5.0 — Telemetry (Alloy) Update Fix
+# GenLayer v0.5.0: Telemetry (Alloy) Update Fix
 
 *Last updated: 2026-02-14 16:22:17 UTC*
 
@@ -142,7 +142,7 @@ docker restart genlayer-node-alloy
 ## Step 4 --- Force a test log entry
 
 ``` bash
-echo "GENLAYER_LOKI_TEST $(date -u +%FT%TZ)" | sudo tee -a /home/dedicaovh/genlayer-node-linux-amd64/data/node/logs/node.log
+echo "GENLAYER_LOKI_TEST $(date -u +%FT%TZ)" | sudo tee -a /home/USER/genlayer-node-linux-amd64/data/node/logs/node.log
 ```
 
 ------------------------------------------------------------------------

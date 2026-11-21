@@ -4,8 +4,6 @@ What a GenLayer node exposes on its ops port, how to read it, and how Cumulo mon
 
 _Last updated: 2026-11-21. Based on our production node: `v0.6.0-rc.5`, GenVM `v0.6.0-rc10`, protocol `v0.6-rc-1`._
 
----
-
 ## 1. Ops server
 
 The node serves four routes on the **ops port** (`node.ops.port`, default `9153`). They are always on:
@@ -24,8 +22,6 @@ curl -s http://127.0.0.1:9153/balance
 ```
 
 With Docker Compose the port is published by `NODE_OPS_PORT` (default `9153`). `/metrics` and `/health` have no authentication: restrict the port with the firewall to your monitoring hosts.
-
----
 
 ## 2. `/health` (v0.6)
 
@@ -84,8 +80,6 @@ The overall `status` is the most urgent state, in the order `unavailable`, `degr
 | `node.snapshot_age` | Age of the newest snapshot | Stays `unknown` if no snapshots are taken |
 
 `consensus.*` conditions are capped at `warning`, and the `genvm.*` conditions at `degraded`: a dead LLM provider keeps the node booted, synced and voting, it votes Timeout on what it cannot execute.
-
----
 
 ## 3. `/metrics`
 
@@ -148,13 +142,9 @@ Series carry the labels `network` and `node`. Main families (all prefixed `genla
 
 The full list with HELP texts is in the [official reference](https://docs.genlayer.com/api-references/genlayer-node/ops/metrics). Go runtime (`go_*`) and process (`process_*`) metrics are also exposed.
 
----
-
 ## 4. What the node does not expose
 
-Stake, epoch, active/quarantined/banned status and rewards are **chain data**, not node metrics. They come from the CLI (`genlayer staking ...`) or from the [official explorer API](https://scan.bradbury.genlayer.com). This explorer reads them from there and shows them on the [Dashboard](index) next to the node's own health.
-
----
+Stake, epoch, active/quarantined/banned status and rewards are **chain data**, not node metrics. They come from the CLI (`genlayer staking ...`) or from the [official explorer API](https://scan.bradbury.genlayer.com). This explorer reads them from there and shows them on the [Dashboard](https://cumulo.pro/services/genlayer/index) next to the node's own health.
 
 ## 5. Prometheus scrape
 
@@ -180,8 +170,6 @@ Suggested alerts:
 | Disk | `genlayer_node_disk_usage_percent > 85` |
 
 A health-based alert is also useful, for example a small exporter or a blackbox probe on `/health` that fires on `status` other than `healthy`. Remember that `warning` can be legitimate (for example during a ban).
-
----
 
 ## 6. Centralized push to the Foundation Grafana Cloud (Alloy)
 
@@ -218,8 +206,6 @@ Verify:
 
 Common problems: URLs with a trailing slash, wrong credentials (401/403), ops port not reachable from the Alloy container.
 
----
-
 ## 7. Container health
 
 The WebDriver and Alloy containers have health checks and restart themselves when a check keeps failing:
@@ -232,8 +218,6 @@ docker compose logs --since 30m webdriver-container alloy
 
 Set `HEALTHCHECK_AUTO_RESTART=false` in `.env` to keep the checks but turn off the automatic restarts.
 
----
-
 ## 8. How Cumulo uses it
 
-The [Dashboard](index) of this explorer reads `/health`, `/metrics` and `/balance` of our node and shows: sync and block lag, uptime, CPU, memory, disk, the health conditions with their reason and action text, operator balance, and consensus submission outcomes. Stake and ranking come from the official explorer API.
+The [Dashboard](https://cumulo.pro/services/genlayer/index) of this explorer reads `/health`, `/metrics` and `/balance` of our node and shows: sync and block lag, uptime, CPU, memory, disk, the health conditions with their reason and action text, operator balance, and consensus submission outcomes. Stake and ranking come from the official explorer API.

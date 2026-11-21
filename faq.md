@@ -4,8 +4,6 @@ Common questions when running a GenLayer validator on **Bradbury Phase 2** with 
 
 _Last updated: 2026-11-21._
 
----
-
 ## 1. Wallets and roles
 
 ### What is the difference between Owner, Operator and Validator Wallet?
@@ -14,14 +12,12 @@ _Last updated: 2026-11-21._
 - **Operator**: hot key on the server that signs consensus duties and pays gas.
 - **Validator Wallet**: the contract created when you join. Goes in `node.validatorWalletAddress`.
 
-See [Key Management](key).
+See [Key Management](https://cumulo.pro/services/genlayer/key).
 
 ### Where are the keystores?
 
 - Owner: in the CLI keystore of the machine where you ran the wizard (`genlayer account list`).
 - Operator on the server: `./data/node/keystore/operator.json` (container path `/app/data/node/keystore/`), owned by uid `10001`.
-
----
 
 ## 2. Configuration
 
@@ -34,7 +30,7 @@ node:
   operatorAddress: "0x..."
 ```
 
-plus the Bradbury Phase 2 `rollup` and `consensus` sections and the protocol manifest. See [Install](install). Also `NODE_PASSWORD` in `.env`.
+plus the Bradbury Phase 2 `rollup` and `consensus` sections and the protocol manifest. See [Install](https://cumulo.pro/services/genlayer/install). Also `NODE_PASSWORD` in `.env`.
 
 ### Can I override `config.yaml` with environment variables?
 
@@ -51,8 +47,6 @@ docker compose --profile node up -d --force-recreate genlayer-node
 ### Can I put the RPC API key in the URL?
 
 No. Set `GENLAYERNODE_ROLLUP_GENLAYERCHAINRPCKEY` in `.env`. The node sends it as the `X-AccessKey` header. A key in a URL ends up in logs and error messages.
-
----
 
 ## 3. The node does not start
 
@@ -92,8 +86,6 @@ Always start the new version with the same Compose project. The release file fix
 
 GenVM moved from `/app/third_party/genvm/config/` to `/app/opt/genvm/current/config/`. Update the mount path in your `docker-compose.override.yml`. A mount left at the old path is ignored without an error.
 
----
-
 ## 4. Doctor
 
 ### What does `doctor` check?
@@ -103,8 +95,6 @@ Chain connectivity, the consensus deployment against the manifest, the GenVM con
 ```bash
 docker compose --profile node run --rm --entrypoint /app/bin/genlayernode genlayer-node doctor
 ```
-
----
 
 ## 5. GenVM and LLM
 
@@ -123,8 +113,6 @@ docker compose --profile node up -d --force-recreate genlayer-node
 ### Where do I find free LLM credits?
 
 See [GenVM Configuration](https://docs.genlayer.com/validators/genvm-configuration) (Heurist, Comput3, io.net, Chutes, Morpheus).
-
----
 
 ## 6. Operations
 
@@ -159,8 +147,6 @@ Node is synced!!! mode=validator node=0x... operator=0x...
 
 and `curl -s http://127.0.0.1:9153/health` returns your `validator_address` and `validator_moniker`.
 
----
-
 ## 7. My validator shows `warning` in /health
 
 `warning` is not always an incident. Read the `reason`, `impact` and `action` of the condition that is not healthy:
@@ -175,13 +161,11 @@ and `curl -s http://127.0.0.1:9153/health` returns your `validator_address` and 
 | `webdriver.render` / `webdriver_check_failed` | WebDriver cannot render the probe page | `docker logs genlayer-node-webdriver`, check its health status |
 | `node.snapshot_age` / `unknown` | No snapshots are taken | Normal, ignore |
 
-Only `unavailable` returns HTTP 503. See [Metrics](metrics) for the full catalog.
+Only `unavailable` returns HTTP 503. See [Metrics](https://cumulo.pro/services/genlayer/metrics) for the full catalog.
 
 ### Why does the explorer show my validator as quarantined or banned while the node is healthy?
 
 Quarantine and ban are decisions of the consensus contracts, not of the node. The node keeps syncing and serving. Check `genlayer staking validator-info 0xWallet` and `validator-history`.
-
----
 
 ## 8. Staking
 
@@ -197,16 +181,14 @@ Read the deployed minimum with `genlayer staking epoch-info --network testnet-br
 
 You signed an owner-only action with another key, or the wallet is owned by a vesting contract. In the second case use `genlayer vesting validator ...`.
 
-See the [Staking guide](staking).
-
----
+See the [Staking guide](https://cumulo.pro/services/genlayer/staking).
 
 ## 9. Migration and recovery
 
 ### How do I move the node to a new server?
 
 1. Stop the old node.
-2. Install Docker and extract the release as in [Install](install).
+2. Install Docker and extract the release as in [Install](https://cumulo.pro/services/genlayer/install).
 3. Copy `config.yaml`, the manifest and `.env`.
 4. Install the operator keystore (uid `10001`) and set `NODE_PASSWORD`.
 5. Run `doctor` and start.
@@ -216,8 +198,6 @@ Never run two nodes with the same operator.
 ### What must I keep safe?
 
 The **owner key**, the **operator keystore** and its passphrase, and the validator wallet address. Losing the operator is recoverable, losing the owner is not.
-
----
 
 ## 10. Safety
 

@@ -6,8 +6,6 @@ _Last updated: 2026-11-21. Node `v0.6.0-rc.5`, GenVM `v0.6.0-rc10`, protocol `v0
 
 > This guide follows the [official setup guide](https://docs.genlayer.com/validators/setup-guide) and shows the values of our own deployment. Always confirm the exact version approved for Bradbury Phase 2 in the [changelog](https://docs.genlayer.com/validators/changelog) before installing.
 
----
-
 ## 1. What runs on the server
 
 Everything runs in containers, managed by one `docker-compose.yaml` that ships inside the release package. The project name is fixed (`genlayer-node`), so a new version started from a new directory replaces the containers of the old one.
@@ -30,8 +28,6 @@ Ports used by the node:
 | `9155` | Admin | Not published by default |
 | `4444` | WebDriver | Local use by the node |
 
----
-
 ## 2. Requirements
 
 | Resource | Requirement |
@@ -45,8 +41,6 @@ Ports used by the node:
 
 Release candidate images (`v0.6.0-rc.N`) are published for `linux/amd64` only.
 
----
-
 ## 3. Before the server: wallet and operator key
 
 A validator uses three addresses. The staking wizard prints all three at the end:
@@ -57,7 +51,7 @@ A validator uses three addresses. The staking wizard prints all three at the end
 | Operator | Hot key on the server, signs consensus duties | `node.operatorAddress` and the keystore |
 | Validator Wallet | Contract created when you join, the on-chain identity | `node.validatorWalletAddress` |
 
-Create them with the CLI (see the [Staking guide](staking) for details):
+Create them with the CLI (see the [Staking guide](https://cumulo.pro/services/genlayer/staking) for details):
 
 ```bash
 npm install -g genlayer@rc
@@ -66,11 +60,9 @@ genlayer staking wizard --network testnet-bradbury
 
 Keep the **operator keystore export** and its passphrase: you install it on the server in section 7.
 
----
-
 ## 4. Prepare the directory
 
-Create a directory for this version and extract the release package into it. Our current directory is `~/genlayer-bradbury-p2/v0.6.0-rc.2` (the name is historical, the content is rc.5).
+Create a directory for this version and extract the release package into it, for example `~/genlayer-node/v0.6.0-rc.5`.
 
 ```bash
 export version=v0.6.0-rc.5   # confirm it is the version approved for Bradbury Phase 2
@@ -107,8 +99,6 @@ cd ./${version}
 ```
 
 With Docker you do not run the GenVM setup script: the image's entrypoint prepares GenVM for the host CPU on the first start.
-
----
 
 ## 5. Configuration
 
@@ -179,11 +169,9 @@ Copy `.env.example` to `.env` (mode `600`) and set at least the variables below.
 | LLM keys | `HEURISTKEY`, `OPENAIKEY`, `ANTHROPICKEY`, `GEMINIKEY`, `XAIKEY`, `OPENROUTERKEY`, `COMPUT3KEY`, `IOINTELLIGENCEKEY`, `LIBERTAI_API_KEY`, `MORPHEUS_API_KEY`, `ATOMAKEY`: set the providers you use |
 | `NETWORK_NAME` | `bradbury-phase2` (label for monitoring) |
 
-Monitoring variables (`CENTRAL_*`, `NODE_ID`, `VALIDATOR_NAME`) are explained in the [Metrics guide](metrics).
+Monitoring variables (`CENTRAL_*`, `NODE_ID`, `VALIDATOR_NAME`) are explained in the [Metrics guide](https://cumulo.pro/services/genlayer/metrics).
 
 Use **more than one LLM provider**. With a single provider, an outage makes the node vote Timeout on every transaction that needs an LLM, and Timeout votes are penalized. See [GenVM configuration](https://docs.genlayer.com/validators/genvm-configuration) for partner credits.
-
----
 
 ## 6. Permissions on the data directory
 
@@ -192,8 +180,6 @@ The container runs as uid `10001` and `./data` keeps the host owner, so give it 
 ```bash
 mkdir -p ./data && sudo chown -R 10001:10001 ./data
 ```
-
----
 
 ## 7. Install the operator key
 
@@ -205,9 +191,7 @@ test ! -e ./data/node/keystore/operator.json || exit 1
 sudo install -m 600 -o 10001 -g 10001 /path/to/operator-keystore.json ./data/node/keystore/operator.json
 ```
 
-Never run two nodes with the same operator key at the same time. More in [Key Management](key).
-
----
+Never run two nodes with the same operator key at the same time. More in [Key Management](https://cumulo.pro/services/genlayer/key).
 
 ## 8. Check, start and verify
 
@@ -240,11 +224,9 @@ curl -s http://127.0.0.1:9153/health | jq '{status, node_version, genvm_version,
 curl -s http://127.0.0.1:9153/balance
 ```
 
-`status` is `healthy` when all is well. `warning` can be legitimate, for example while the validator is banned or waiting to prime. See the [FAQ](faq) and [Metrics](metrics) pages.
+`status` is `healthy` when all is well. `warning` can be legitimate, for example while the validator is banned or waiting to prime. See the [FAQ](https://cumulo.pro/services/genlayer/faq) and [Metrics](https://cumulo.pro/services/genlayer/metrics) pages.
 
 The operator must hold GEN to pay gas. Watch `/balance` and the `consensus.operator_funds` condition.
-
----
 
 ## 9. Upgrades
 
@@ -255,8 +237,6 @@ Read the [changelog](https://docs.genlayer.com/validators/changelog) of the targ
 
 Do not use `genlayernode run --upgrade` in v0.6: the call that resumes the node is not available yet, so the node waits forever.
 
----
-
 ## 10. Useful commands
 
 ```bash
@@ -266,8 +246,6 @@ docker restart genlayer-node                        # restart the node only
 docker compose --profile node down                  # stop everything (data stays in ./data)
 docker inspect --format '{{.State.Health.Status}}' genlayer-node-webdriver
 ```
-
----
 
 ## References
 

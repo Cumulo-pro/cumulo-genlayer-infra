@@ -1,93 +1,55 @@
-# 🚀 Cumulo — GenLayer Validator Infrastructure  
-**Asimov Testnet — Validator, Staking, Key Management & Monitoring**
+# Cumulo: GenLayer Validator Infrastructure
 
-This repository documents Cumulo’s complete infrastructure, tooling, and operational workflows for running a **GenLayer validator on Asimov Testnet**.  
-It includes staking operations, key management procedures, monitoring endpoints, validator lifecycle steps, and production-grade operational practices.
+**Bradbury Phase 2 (testnet): validator, staking, key management and monitoring with Docker Compose**
 
-GenLayer introduces a modular validation layer built on zkSync technology, enabling decentralized validation markets, operator separation, and flexible staking economics.  
-Cumulo operates a fully configured validator node and maintains this repository to help other operators understand and replicate a professional-grade setup.
+This repository documents how Cumulo runs a **GenLayer validator on Bradbury Phase 2** (chain id `4221`): installation with Docker Compose, staking operations, key management, monitoring endpoints and the operational practices we follow.
 
----
+Current setup: node `v0.6.0-rc.5`, GenVM `v0.6.0-rc10`, protocol `v0.6-rc-1`, deployed with the release `docker-compose.yaml`.
 
-## 🔗 Official GenLayer Resources
+Live status of our validator, node health and the validator set: https://cumulo.pro/services/genlayer/
 
-- 📘 Docs → https://docs.genlayer.com/  
-- 📊 Points Program → https://points.genlayer.foundation/  
-- 🔍 Explorer → https://genlayer-explorer.vercel.app/  
-- 📰 Blog → https://www.genlayer.com/blog  
-- 💻 GitHub → https://github.com/genlayerlabs  
+## Official GenLayer resources
 
----
+- Docs: https://docs.genlayer.com/
+- Validator setup guide: https://docs.genlayer.com/validators/setup-guide
+- Changelog: https://docs.genlayer.com/validators/changelog
+- Explorer (Bradbury): https://scan.bradbury.genlayer.com/
+- GitHub: https://github.com/genlayerlabs
 
-## 📚 Documentation Index (Cumulo)
+## Documentation index
 
-### **1️⃣ Validator Installation Guide (GenLayer)**
-Step-by-step guide to install and run a GenLayer validator from scratch: system requirements, node setup, GenVM configuration, LLM (Heurist), WebDriver, systemd, and first sync.  
-👉 https://github.com/Cumulo-pro/cumulo-genlayer-infra/blob/main/genlayer-validator-installation-cumulo.md
+| Guide | What it covers |
+|---|---|
+| [Validator installation](genlayer-validator-installation-cumulo.md) | Docker Compose deployment: services and ports, release download and signature check, `config.yaml`, protocol manifest, `.env`, operator keystore, `doctor`, start, upgrades |
+| [Staking guide](genlayer_staking_guide.md) | CLI install, wizard, validator states, priming, deposit, exit, claim, identity, operator change, vesting |
+| [Key management](genlayer-key-management.md) | Owner and operator keys, keystore installation, backup, restore, operator rotation |
+| [Metrics and monitoring](genlayer_metrics_doc.md) | `/health` conditions, `/metrics` families, Prometheus scrape and alerts, Alloy push to Grafana Cloud |
+| [Validator FAQ](faq.md) | Configuration, startup errors, health warnings, GenVM and LLM providers, migration and recovery |
 
----
+## Historical documents
 
-### **2️⃣ Staking Guide**  
-How to stake, deposit more GEN, prime epochs, activate stake, exit, and claim withdrawals.  
-👉 https://github.com/Cumulo-pro/cumulo-genlayer-infra/blob/main/genlayer_staking_guide.md
+These describe earlier networks and versions and are kept for reference only.
 
----
+- [Upgrade to v0.4.2 (Asimov testnet)](upgrade-v0.4.2.md)
+- [Telemetry (Alloy) update fix for v0.5.0](genlayer-v0_5_0-telemetry-update-fix_md)
+- [Bradbury Phase 1 installation (v0.5.5, binary install)](bradbury/genlayer-validator-installation-bradbury-cumulo.md)
 
-### **3️⃣ Key Management**  
-Backup, export, restore, rotate Owner & Operator keys safely.  
-👉 https://github.com/Cumulo-pro/cumulo-genlayer-infra/blob/main/genlayer-key-management.md
+## About this repository
 
----
+- Documentation written from our own production deployment.
+- Values specific to a deployment (secrets, keys, hosts) are never published here.
+- Commands are meant to be adapted: confirm the approved node version for the network in the official changelog before installing.
 
-### **4️⃣ Validator FAQ**  
-Quick answers about configuration, systemd, troubleshooting, WebDriver, operator import, migration & recovery.  
-👉 [https://github.com/Cumulo-pro/cumulo-genlayer-infra/blob/main/faq](https://github.com/Cumulo-pro/cumulo-genlayer-infra/blob/main/faq.md)
+## Upgrade history
 
----
+| Version | Date | Method | Notes |
+|---|---|---|---|
+| v0.4.0 | 2025-12-05 | Fresh | Initial setup (Asimov) |
+| v0.4.1 | 2025-12-19 | In-place | Binary upgrade |
+| v0.4.2 | 2025-12-29 | In-place | Telemetry env vars |
 
-### **5️⃣ Metrics & Monitoring Guide**  
-Full breakdown of `/health` and `/metrics` endpoints, Prometheus metrics, monitoring strategy, and limitations.  
-👉 https://github.com/Cumulo-pro/cumulo-genlayer-infra/blob/main/genlayer_metrics_doc.md  
+## About Cumulo
 
----
+Cumulo is a professional blockchain infrastructure operator running validators, RPC nodes and DA infrastructure across modular ecosystems such as Celestia, Starknet, Dymension, Avail and GenLayer. Our priority is reliability, transparency and high-quality tooling for decentralized ecosystems.
 
-## 🔄 Validator Upgrades
-
-- [Upgrade to v0.4.2 (Asimov Testnet)](upgrade-v0.4.2.md)
-
----
-
-## 🏗️ About This Repository
-
-This repository includes:
-
-- Complete validator setup carried out by Cumulo.  
-- Step-by-step documentation for:
-  - Running the GenLayer node
-  - Staking & validator deposit flows
-  - Key backups & operator setup
-  - Monitoring with Prometheus
-  - Systemd service management  
-- Operational notes and incident logs relevant to GenLayer testnet participation.
-
-The goal is to provide a **transparent, reproducible, and well-documented validator stack** while contributing back to the GenLayer validator community.
-
----
-
-
-## Upgrade History
-
-| Version | Date       | Method    | Notes |
-|-------|------------|-----------|------|
-| v0.4.0 | 2025-12-05 | Fresh     | Initial setup |
-| v0.4.1 | 2025-12-19 | In-place  | Binary upgrade |
-| v0.4.2 | 2025-12-29 | In-place  | Telemetry env vars |
-
----
-
-## 🏢 About Cumulo
-
-Cumulo is a professional blockchain infrastructure operator running validators, RPC nodes, and DA infrastructure across modular ecosystems such as Celestia, Story, Starknet, Dymension, Avail, and now **GenLayer**.  
-Our priority is reliability, transparency, and high-quality tooling for decentralized ecosystems.
-
-Visit us: https://cumulo.pro/
+Website: https://cumulo.pro/
