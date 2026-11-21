@@ -1,44 +1,31 @@
-# GenLayer Validator Node — FAQ
+# GenLayer Validator Node FAQ (Bradbury Phase 2, Docker Compose)
 
-This FAQ compiles the most common doubts when running a **GenLayer Asimov Testnet validator**.
+Common questions when running a GenLayer validator on **Bradbury Phase 2** with Docker Compose, node **v0.6.0-rc.5**.
 
----
-
-## 1. Wallets & Roles
-
-### Q1: What is the difference between Owner, Operator and Validator Wallet?
-
-- **Owner**
-  - Controls the stake.
-  - Signs transactions to create/join/update the validator.
-  - Should be stored in a safer environment (cold storage if possible).
-
-- **Operator**
-  - Hot wallet on the validator server.
-  - Used by the node to sign blocks and participate in consensus.
-  - Imported via `genlayernode account import ... --setup`.
-
-- **Validator Wallet (contract)**
-  - Smart contract address that represents your validator.
-  - Returned by `genlayer staking wizard`.
-  - Must be set in `node.validatorWalletAddress` in `config.yaml`.
-
-### Q2: Where are the keystores stored?
-
-- Owner keystore (CLI machine):
-  - `~/.genlayer/keystores/owner.json` (path may vary).
-- Operator keystore (node):
-  - `./data/node/keystore/UTC--...` inside the node directory.
-- Recommended backup:
-  - Use `genlayernode account export` to produce `backup.key` files and store them securely.
+_Last updated: 2026-11-21._
 
 ---
 
-## 2. Configuration & `config.yaml`
+## 1. Wallets and roles
 
-### Q3: Which fields must be correct for validator mode to work?
+### What is the difference between Owner, Operator and Validator Wallet?
 
-At minimum:
+- **Owner**: holds the stake, signs deposits, exits, claims and identity changes. Cold key, never on the server.
+- **Operator**: hot key on the server that signs consensus duties and pays gas.
+- **Validator Wallet**: the contract created when you join. Goes in `node.validatorWalletAddress`.
+
+See [Key Management](key).
+
+### Where are the keystores?
+
+- Owner: in the CLI keystore of the machine where you ran the wizard (`genlayer account list`).
+- Operator on the server: `./data/node/keystore/operator.json` (container path `/app/data/node/keystore/`), owned by uid `10001`.
+
+---
+
+## 2. Configuration
+
+### Which fields must be right for validator mode?
 
 ```yaml
 node:
@@ -47,245 +34,193 @@ node:
   operatorAddress: "0x..."
 ```
 
-Plus, correct rollup / consensus config:
+plus the Bradbury Phase 2 `rollup` and `consensus` sections and the protocol manifest. See [Install](install). Also `NODE_PASSWORD` in `.env`.
 
-```yaml
-rollup:
-  genlayerchainrpcurl: "https://genlayer-testnet.rpc.caldera.xyz/http"
-  genlayerchainwebsocketurl: "wss://genlayer-testnet.rpc.caldera.xyz/ws"
+### Can I override `config.yaml` with environment variables?
 
-consensus:
-  contractmainaddress: "0x..."
-  contractdataaddress: "0x..."
-  genesis: <block_number>
-```
+Yes. Prefix `GENLAYERNODE_`, dots become underscores, uppercase. For example `node.operatorAddress` is `GENLAYERNODE_NODE_OPERATORADDRESS`. Only keys that exist (uncommented) in the file are picked up. Put them in the `.env` next to `docker-compose.yaml`.
 
-### Q4: Can I override config.yaml with environment variables?
+### I edited `config.yaml` and nothing changed.
 
-Yes. Any key can be overridden via `GENLAYERNODE_`-prefixed environment variables:
-
-- `rollup.genlayerchainrpcurl` → `GENLAYERNODE_ROLLUP_GENLAYERCHAINRPCURL`
-- `node.validatorWalletAddress` → `GENLAYERNODE_NODE_VALIDATORWALLETADDRESS`
-- `node.operatorAddress` → `GENLAYERNODE_NODE_OPERATORADDRESS`
-
-Example:
+The file is mounted read-only into the container and read at start. Recreate the container:
 
 ```bash
-export GENLAYERNODE_NODE_VALIDATORWALLETADDRESS="0x..."
-export GENLAYERNODE_NODE_OPERATORADDRESS="0x..."
+docker compose --profile node up -d --force-recreate genlayer-node
+```
+
+### Can I put the RPC API key in the URL?
+
+No. Set `GENLAYERNODE_ROLLUP_GENLAYERCHAINRPCKEY` in `.env`. The node sends it as the `X-AccessKey` header. A key in a URL ends up in logs and error messages.
+
+---
+
+## 3. The node does not start
+
+### `password is required for validator mode`
+
+`NODE_PASSWORD` is empty in `.env`. It has no default on purpose.
+
+### Permission denied writing to `data`
+
+The container runs as uid `10001`:
+
+```bash
+sudo chown -R 10001:10001 ./data
+```
+
+### The manifest is refused at startup
+
+Since v0.6 the node checks `configs/node/protocol-manifest.json` against `consensus.consensusaddress` and `consensus.chainid`. Download the Bradbury manifest again and check that `chainid` is `"4221"` and `consensusaddress` is `0x3F71AE080BD6270A91dBcc7960d88797828538E0`:
+
+```bash
+curl -fsSL https://docs.genlayer.com/validators/bradbury.protocol-manifest.json -o configs/node/protocol-manifest.json
+```
+
+### `chain.websocket` is `degraded` or the node never connects
+
+The Bradbury WebSocket refuses connections without an API key. Create one at [app.conduit.xyz/rpc-keys](https://app.conduit.xyz/rpc-keys) and set `GENLAYERNODE_ROLLUP_GENLAYERCHAINRPCKEY`.
+
+### The node starts as `mode=full`
+
+`validatorWalletAddress` or `operatorAddress` is missing in `config.yaml`. Run `doctor`.
+
+### Container name already in use after an upgrade
+
+Always start the new version with the same Compose project. The release file fixes `name: genlayer-node` for this. If you removed that line, restore it.
+
+### My custom GenVM config is ignored after v0.6
+
+GenVM moved from `/app/third_party/genvm/config/` to `/app/opt/genvm/current/config/`. Update the mount path in your `docker-compose.override.yml`. A mount left at the old path is ignored without an error.
+
+---
+
+## 4. Doctor
+
+### What does `doctor` check?
+
+Chain connectivity, the consensus deployment against the manifest, the GenVM configuration (binaries, module config, LLM keys with a live call to each enabled provider) and the WebDriver.
+
+```bash
+docker compose --profile node run --rm --entrypoint /app/bin/genlayernode genlayer-node doctor
 ```
 
 ---
 
-## 3. Node Fails to Start
+## 5. GenVM and LLM
 
-### Q5: Error: `build dependencies: validator address is not set`
+### How many LLM providers do I need?
 
-This usually means one of:
+Configure **more than one**. With a single provider, an outage or an empty balance makes the node vote Timeout on every transaction that needs an LLM, and Timeout votes are penalized. `doctor` warns when only one backend is usable.
 
-1. `node.mode` is `validator` but:
-   - `validatorWalletAddress` is empty or invalid, or
-   - `operatorAddress` is empty or invalid.
-2. No operator account imported with `--setup`.
+### I added or changed an API key and nothing happened.
 
-**Fix:**
-
-1. Check `configs/node/config.yaml`:
+Keys are read from the environment at start. Recreate the container:
 
 ```bash
-grep -n "validatorWalletAddress\|operatorAddress" configs/node/config.yaml
+docker compose --profile node up -d --force-recreate genlayer-node
 ```
 
-2. Re-import the operator using:
+### Where do I find free LLM credits?
 
-```bash
-./bin/genlayernode account import   --password "<NODE_KEYSTORE_PASSWORD>"   --passphrase "<BACKUP_FILE_PASSPHRASE>"   --path "$(pwd)/old-keystores/backup.key"   -c "$(pwd)/configs/node/config.yaml"   --setup
-```
-
-3. Re-run:
-
-```bash
-./bin/genlayernode doctor -c configs/node/config.yaml
-```
-
-### Q6: Error: `genvm: executable file not found in $PATH`
-
-GenVM was not set up yet.
-
-**Fix:**
-
-```bash
-python3 ./third_party/genvm/bin/setup.py
-```
-
-Then re-run:
-
-```bash
-./bin/genlayernode doctor -c configs/node/config.yaml
-```
+See [GenVM Configuration](https://docs.genlayer.com/validators/genvm-configuration) (Heurist, Comput3, io.net, Chutes, Morpheus).
 
 ---
 
-## 4. Doctor Command
+## 6. Operations
 
-### Q7: What does `doctor` check?
-
-`./bin/genlayernode doctor -c configs/node/config.yaml` validates:
-
-- zkSync RPC & WebSocket connectivity.
-- Consensus contract addresses and genesis.
-- Validator wallet & operator configuration.
-- GenVM binaries and configs.
-- LLM provider environment variables.
-- WebDriver availability and response.
-
-### Q8: Doctor fails with WebDriver 404 on `/render`, but node works. Is it a problem?
-
-Usually not critical.  
-The `doctor` tool may use an endpoint (`/render`) that older WebDriver images don’t expose.
-
-- If your node logs show GenVM working.
-- And WebDriver container is healthy (`docker ps` OK).
-
-…you can keep running while planning a later update to the recommended WebDriver image.
-
----
-
-## 5. GenVM & LLM
-
-### Q9: How do I enable a single LLM provider (Heurist, example)?
-
-1. In `third_party/genvm/config/genvm-module-llm.yaml`, set:
-
-```yaml
-providers:
-  heurist:
-    enabled: true
-    # ...
-  comput3:
-    enabled: false
-  ionet:
-    enabled: false
-  libertai:
-    enabled: false
-```
-
-2. Export the API key in the environment (systemd or shell):
+### How do I start, stop and see logs?
 
 ```bash
-export HEURISTKEY="your_heurist_api_key"
+docker compose --profile node up -d          # start
+docker compose --profile node down           # stop (data stays in ./data)
+docker restart genlayer-node                 # restart the node only
+docker compose logs -f genlayer-node         # live logs
+docker compose --profile node ps             # status
 ```
 
-3. Restart the node.
+The container's own log rotates at 100 MB with 3 files. The node also writes its own log files to `./data/node/logs` (DEBUG level, rotated).
 
----
+### Which ports does the node use?
 
-## 6. Systemd & Operations
+| Port | Use |
+|---|---|
+| `9151` | Node JSON-RPC |
+| `9153` | Ops: `/health`, `/metrics`, `/balance` |
+| `9155` | Admin |
+| `4444` | WebDriver |
 
-### Q10: How do I manage the node with Systemd?
+### How do I know it is running as a validator?
 
-Assuming the unit is named `genlayernode.service`:
-
-```bash
-# Start / stop / restart
-sudo systemctl start genlayernode.service
-sudo systemctl stop genlayernode.service
-sudo systemctl restart genlayernode.service
-
-# Status
-sudo systemctl status genlayernode.service
-
-# Logs (live)
-sudo journalctl -u genlayernode.service -f --no-hostname -o cat
-```
-
-### Q11: What are the main ports?
-
-From `config.yaml`:
-
-- RPC: `9151`
-- Ops (metrics/health): `9153`
-- Admin: `9155` (if used)
-
----
-
-## 7. Monitoring & Metrics
-
-### Q12: Where can I see metrics?
-
-Once running:
-
-```bash
-curl http://127.0.0.1:9153/metrics
-```
-
-You can scrape this with Prometheus and build dashboards in Grafana.
-
-### Q13: How can I monitor node health?
-
-- HTTP health endpoint:
-
-```bash
-curl http://127.0.0.1:9153/health
-```
-
-- Systemd status & journald logs.
-- Alerts based on:
-  - Node sync status.
-  - Consensus participation.
-  - GenVM / LLM errors.
-  - RPC/ops ports accessibility.
-
----
-
-## 8. Migration & Recovery
-
-### Q14: How do I move the node to a new server?
-
-1. Install:
-   - Docker (for WebDriver).
-   - Python3 + `python3-venv`.
-2. Copy or re-download the node tarball.
-3. Copy `configs/node/config.yaml`.
-4. Import the operator key with `--setup` from a secure `backup.key`.
-5. Run `python3 ./third_party/genvm/bin/setup.py`.
-6. Configure and start WebDriver.
-7. Install and start the Systemd service.
-
-### Q15: What MUST be preserved to avoid losing the validator?
-
-- OWNER keystore (controls stake).
-- OPERATOR keystore or backup (`backup.key`).
-- Validator wallet address (contract).
-- Enough GEN balance on operator for gas costs.
-
-Losing the operator key is recoverable (you can change operator), but losing the owner key can mean loss of control over staked funds.
-
----
-
-## 9. Troubleshooting Snapshot
-
-### Q16: How do I quickly see if the node is running as validator?
-
-Check logs:
-
-```bash
-journalctl -u genlayernode.service -f --no-hostname -o cat
-```
-
-You should see lines similar to:
+The logs should show:
 
 ```text
 Node is synced!!! mode=validator node=0x... operator=0x...
-Successfully started mode=validator node=0x... operator=0x...
 ```
 
-If you see `mode=full` instead, validator-specific config is probably missing or incorrect.
+and `curl -s http://127.0.0.1:9153/health` returns your `validator_address` and `validator_moniker`.
 
 ---
 
-## 10. Safety Notes
+## 7. My validator shows `warning` in /health
 
-- Never expose your operator or owner private keys in logs, scripts, or screenshots.
-- Use strong passphrases when exporting keystores to `backup.key`.
-- Always verify on-chain addresses (contracts, wallets) with official GenLayer docs or trusted community references.
+`warning` is not always an incident. Read the `reason`, `impact` and `action` of the condition that is not healthy:
+
+| Condition and reason | Meaning | What to do |
+|---|---|---|
+| `consensus.ban` / `validator_banned` | The validator is banned until `until_epoch` (or permanently). The node syncs but earns nothing | Wait for that epoch. If permanent, join again with a new validator |
+| `consensus.prime` / `prime_not_landing` | The prime window is open and the prime did not land. The validator forfeits that epoch's inflation | Check the operator balance and the logs. Anyone can prime it: `genlayer staking validator-prime 0xWallet` |
+| `consensus.operator_funds` / `operator_balance_critical` | Operator is low on gas | Send GEN to the operator address |
+| `consensus.stake` / `self_stake_below_minimum` | Self-stake is under the minimum, validator is not selected | Add stake with `validator-deposit` (owner) |
+| `genvm.llm` | A provider fails | Check API keys and credits, configure more than one provider |
+| `webdriver.render` / `webdriver_check_failed` | WebDriver cannot render the probe page | `docker logs genlayer-node-webdriver`, check its health status |
+| `node.snapshot_age` / `unknown` | No snapshots are taken | Normal, ignore |
+
+Only `unavailable` returns HTTP 503. See [Metrics](metrics) for the full catalog.
+
+### Why does the explorer show my validator as quarantined or banned while the node is healthy?
+
+Quarantine and ban are decisions of the consensus contracts, not of the node. The node keeps syncing and serving. Check `genlayer staking validator-info 0xWallet` and `validator-history`.
+
+---
+
+## 8. Staking
+
+### How much do I need to stake?
+
+Read the deployed minimum with `genlayer staking epoch-info --network testnet-bradbury`. 42,000 GEN is a protocol default, not a guaranteed current value. Delegation does not replace the required self-stake.
+
+### How long does unbonding take?
+
+7 epochs after `validator-exit`, then `validator-claim`.
+
+### `OwnableUnauthorizedAccount`
+
+You signed an owner-only action with another key, or the wallet is owned by a vesting contract. In the second case use `genlayer vesting validator ...`.
+
+See the [Staking guide](staking).
+
+---
+
+## 9. Migration and recovery
+
+### How do I move the node to a new server?
+
+1. Stop the old node.
+2. Install Docker and extract the release as in [Install](install).
+3. Copy `config.yaml`, the manifest and `.env`.
+4. Install the operator keystore (uid `10001`) and set `NODE_PASSWORD`.
+5. Run `doctor` and start.
+
+Never run two nodes with the same operator.
+
+### What must I keep safe?
+
+The **owner key**, the **operator keystore** and its passphrase, and the validator wallet address. Losing the operator is recoverable, losing the owner is not.
+
+---
+
+## 10. Safety
+
+- Never share private keys, passphrases or your `.env` in logs, screenshots or chats.
+- Restrict port `9153` with the firewall: `/metrics` and `/health` have no authentication.
+- Check contract and wallet addresses against the official GenLayer documentation.

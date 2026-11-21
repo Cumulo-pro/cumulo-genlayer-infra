@@ -1,255 +1,239 @@
-# GenLayer Validator Metrics Documentation
+# GenLayer Validator Metrics and Health (Bradbury Phase 2)
 
-This document describes all **currently exposed metrics** by a GenLayer validator node, based on a **real production node running v0.4.2**, and provides guidance for professional monitoring setups.
+What a GenLayer node exposes on its ops port, how to read it, and how Cumulo monitors it.
 
----
-
-## 1. Overview
-
-A GenLayer node exposes two diagnostic endpoints on the **Ops port (default `9153`)**:
-
-| Endpoint | Description |
-|--------|-------------|
-| `/health` | High-level node health summary in JSON format |
-| `/metrics` | Prometheus-formatted metrics (Go runtime + process) |
-
-Example:
-
-- `http://<node-ip>:9153/health`
-- `http://<node-ip>:9153/metrics`
+_Last updated: 2026-11-21. Based on our production node: `v0.6.0-rc.5`, GenVM `v0.6.0-rc10`, protocol `v0.6-rc-1`._
 
 ---
 
-## 2. `/health` Endpoint
+## 1. Ops server
 
-### Example Output (Real Node)
+The node serves four routes on the **ops port** (`node.ops.port`, default `9153`). They are always on:
+
+| Route | Description |
+|---|---|
+| `GET /health` | Overall status plus a catalog of typed conditions |
+| `GET /metrics` | Prometheus metrics, about 130 `genlayer_*` series plus Go and process metrics |
+| `GET /balance` | Operator balance in hex, wei and GEN (validator mode only) |
+| `POST /snapshot` | Operator snapshots. Denied (401) unless `GENLAYERNODE_NODE_OPERATOR_TOKEN` is set |
+
+```bash
+curl -s http://127.0.0.1:9153/health
+curl -s http://127.0.0.1:9153/metrics | grep '^genlayer_node_'
+curl -s http://127.0.0.1:9153/balance
+```
+
+With Docker Compose the port is published by `NODE_OPS_PORT` (default `9153`). `/metrics` and `/health` have no authentication: restrict the port with the firewall to your monitoring hosts.
+
+---
+
+## 2. `/health` (v0.6)
+
+The format changed in v0.6: there is no `checks` object any more, the node returns a **catalog of conditions** and every condition is always present.
 
 ```json
 {
-  "checks": {
-    "validating": {
-      "status": "up",
-      "timestamp": "2026-01-02T18:32:49.291636613Z"
-    },
-    "zksync": {
-      "status": "up",
-      "timestamp": "2026-01-02T18:32:49.386973419Z"
-    },
-    "zksync-websocket": {
-      "status": "up",
-      "timestamp": "2026-01-02T18:32:49.416261997Z"
+  "status": "warning",
+  "network": "bradbury-phase2",
+  "node_version": "v0.6.0-rc.5",
+  "genvm_version": "v0.6.0-rc10",
+  "protocol_version": "v0.6-rc-1",
+  "validator_address": "0xe2c6...fbbF",
+  "validator_moniker": "Cumulo",
+  "conditions": {
+    "chain.rpc": { "state": "healthy", "...": "..." },
+    "consensus.ban": {
+      "state": "warning",
+      "reason": "validator_banned",
+      "details": { "permanent": "false", "until_epoch": "27" },
+      "impact": "The consensus contracts do not select this validator for a round. The node earns nothing.",
+      "action": "Wait for the stated epoch. If the ban is permanent, restake with a new validator."
     }
-  },
-  "genvm_version": "v0.2.7",
-  "node_version": "v0.4.2",
-  "protocol_version": "v0.4:1dd08066",
-  "status": "up"
+  }
 }
 ```
 
-### 2.1 Meaning of Each Field
+### States
 
-| Field | Description |
-|------|-------------|
-| `status` | Global node status (`up` means operational). |
-| `checks.validating.status` | Validator mode is active and the validation loop is running. |
-| `checks.zksync.status` | RPC connectivity to zkSync L1. |
-| `checks.zksync-websocket.status` | WebSocket connectivity to zkSync L1. |
-| `genvm_version` | Installed GenVM module version. |
-| `node_version` | Node binary version running. |
-| `protocol_version` | Consensus protocol version/hash. |
+| State | Meaning | Alerted |
+|---|---|---|
+| `unknown` | Never observed (for example `node.snapshot_age` on a node that takes no snapshots) | no |
+| `healthy` | Last observation succeeded | no |
+| `suspect` | One failure, not confirmed yet | no |
+| `warning` | Works, but confirmed sub-optimal | yes |
+| `degraded` | Failure confirmed, the capability does not work | yes |
+| `unavailable` | The node cannot do its duty | yes |
 
-### 2.2 Suggested Prometheus Metrics (via small exporter)
+The overall `status` is the most urgent state, in the order `unavailable`, `degraded`, `warning`, `suspect`, `unknown`, `healthy`. Only `unavailable` returns **HTTP 503**, so a banned or unfunded node still answers 200.
 
-`/health` is JSON, so you typically transform it into Prometheus metrics:
+### Conditions
 
-```text
-genlayer_health_up 1
-genlayer_validating_up 1
-genlayer_zksync_rpc_up 1
-genlayer_zksync_ws_up 1
+| Condition | What it tells you | Typical reasons |
+|---|---|---|
+| `chain.rpc` | HTTP RPC to the GenLayer chain works | `chain_rpc_unreachable` (503 after 30 s) |
+| `chain.websocket` | WebSocket works (needs the Conduit key) | `websocket_disconnected` (503 after 30 s) |
+| `chain.sync` | Node follows the chain head | `sync_blocked` (503 after 5 min without progress) |
+| `consensus.ban` | Validator is banned | `validator_banned`, details `until_epoch`, `permanent` |
+| `consensus.stake` | Self-stake meets the minimum | `self_stake_pending`, `self_stake_below_minimum` |
+| `consensus.operator_funds` | Operator has gas | `operator_balance_critical` |
+| `consensus.prime` | Priming for the next epoch lands | `prime_not_landing` |
+| `genvm.llm` | LLM providers answer | Provider down or without credit |
+| `genvm.web` | GenVM web module works | |
+| `webdriver.render` | Fresh render probe of the WebDriver (10 s limit) | `webdriver_check_failed` |
+| `node.disk` | Free disk | `disk_space_critical` (503 at 2% free) |
+| `node.snapshot_age` | Age of the newest snapshot | Stays `unknown` if no snapshots are taken |
 
-genlayer_node_version_info{version="v0.4.2"} 1
-genlayer_genvm_version_info{version="v0.2.7"} 1
-genlayer_protocol_version_info{version="v0.4:1dd08066"} 1
+`consensus.*` conditions are capped at `warning`, and the `genvm.*` conditions at `degraded`: a dead LLM provider keeps the node booted, synced and voting, it votes Timeout on what it cannot execute.
+
+---
+
+## 3. `/metrics`
+
+Series carry the labels `network` and `node`. Main families (all prefixed `genlayer_`):
+
+### Sync and chain
+
+| Metric | Description |
+|---|---|
+| `genlayer_node_synced` | 1 when the node is synced |
+| `genlayer_node_blocks_behind` | Blocks behind the chain head |
+| `genlayer_node_latest_block`, `genlayer_node_synced_block`, `genlayer_node_processing_block` | Block heights |
+| `genlayer_node_sync_halted`, `genlayer_node_sync_stuck_block`, `genlayer_node_sync_consecutive_failures` | Sync problems |
+| `genlayer_node_uptime_seconds` | Seconds since start, detects restarts |
+| `genlayer_node_info` | Build information |
+| `genlayer_node_health_state`, `genlayer_node_operator_condition_state` | Health roll-up and each condition as a one-hot gauge |
+
+### Consensus duties
+
+| Metric | Description |
+|---|---|
+| `genlayer_node_consensus_submit_total{method,outcome}` | Outcome of every duty submission: `success`, `reverted` (mined, gas billed), `failed` (never landed) |
+| `genlayer_node_consensus_revert_total` | Decoded revert reasons for duty transactions |
+| `genlayer_node_transactions_validator_commit_total`, `..._validator_reveal_total` | Validator commits and reveals |
+| `genlayer_node_transactions_leader_proposed_total`, `..._leader_revealed_total` | Leader duties |
+| `genlayer_node_transactions_activated_total`, `..._accepted_synced_total` | Transactions seen |
+| `genlayer_node_prime_blocked_insufficient_funds` | Priming blocked by lack of funds |
+
+### Gas, fees and operator wallet
+
+| Metric | Description |
+|---|---|
+| `genlayer_node_gas_spent_wei_total` | Cumulative gas billed to the operator |
+| `genlayer_node_fees_operator_insufficient_funds_total` | Duties rejected for lack of funds. A sustained increase means the operator needs GEN |
+| `genlayer_node_gas_estimation_total`, `..._gas_shortfall_total`, `..._gas_block_limit_exhausted_total` | Gas estimation quality |
+| `genlayer_node_fees_distributed_wei_total`, `..._fees_settlement_events_total` | Fee settlement (`severity=alarm` needs attention) |
+| `genlayer_node_transact_*` | Nonce state: stuck, dropped, gap, desync, pending |
+
+### GenVM
+
+| Metric | Description |
+|---|---|
+| `genlayer_node_genvm_executions`, `..._executions_total` | Executions running and total |
+| `genlayer_node_genvm_execution_time_seconds_total` | Execution time |
+| `genlayer_node_genvm_permits_current`, `..._concurrent_executions_max` | Concurrency |
+
+### Resources
+
+| Metric | Description |
+|---|---|
+| `genlayer_node_cpu_usage_percent{component}` | CPU for `node`, `genvm`, `webdriver` |
+| `genlayer_node_memory_rss_bytes`, `..._memory_usage_bytes`, `..._memory_percent`, `..._memory_limit_bytes` | Memory |
+| `genlayer_node_disk_usage_percent`, `..._disk_free_bytes`, `..._disk_total_bytes{directory}` | Disk per data directory |
+| `genlayer_node_state_disk_bytes`, `genlayer_node_state_pruning_*` | Contract state size and pruning |
+| `genlayer_node_network_rx_bytes_total`, `..._tx_bytes_total` | Traffic |
+
+### Chain RPC client
+
+`genlayer_rollup_rpc_requests_total`, `..._errors_total`, `..._retries_total`, `..._request_duration_seconds` (histogram), `..._circuit_state`, and the WebSocket series `genlayer_rollup_ws_*` (connections, reconnections, `ws_rpc_healthy`).
+
+The full list with HELP texts is in the [official reference](https://docs.genlayer.com/api-references/genlayer-node/ops/metrics). Go runtime (`go_*`) and process (`process_*`) metrics are also exposed.
+
+---
+
+## 4. What the node does not expose
+
+Stake, epoch, active/quarantined/banned status and rewards are **chain data**, not node metrics. They come from the CLI (`genlayer staking ...`) or from the [official explorer API](https://scan.bradbury.genlayer.com). This explorer reads them from there and shows them on the [Dashboard](index) next to the node's own health.
+
+---
+
+## 5. Prometheus scrape
+
+```yaml
+scrape_configs:
+  - job_name: genlayer-node
+    scrape_interval: 15s
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["NODE_IP:9153"]
 ```
 
----
+Suggested alerts:
 
-## 3. `/metrics` Endpoint (Prometheus Format)
+| Alert | Expression |
+|---|---|
+| Node down | `up{job="genlayer-node"} == 0` for 2m |
+| Not synced | `genlayer_node_synced == 0` for 5m |
+| Falling behind | `genlayer_node_blocks_behind > 50` for 10m |
+| Restart | `changes(genlayer_node_uptime_seconds[10m]) > 0` or `resets(genlayer_node_uptime_seconds[10m]) > 0` |
+| Operator low on funds | `increase(genlayer_node_fees_operator_insufficient_funds_total[15m]) > 0` |
+| Failed submissions | `increase(genlayer_node_consensus_submit_total{outcome="failed"}[15m]) > 0` |
+| Disk | `genlayer_node_disk_usage_percent > 85` |
 
-The `/metrics` output currently exposes **Go runtime**, **memory**, **CPU**, **network IO**, and **process-level** information.
-
-> Important: these are mostly infrastructure metrics. Validator-state and staking metrics are not included (see section 4).
-
-Below is a categorized breakdown of what your node currently emits.
-
----
-
-## 3.1 Go Runtime Metrics
-
-### Garbage Collection
-
-- `go_gc_duration_seconds`: GC pause times (summary).
-- `go_gc_gogc_percent`: GC target heap percentage (GOGC).
-- `go_gc_gomemlimit_bytes`: Configured Go runtime memory limit (GOMEMLIMIT).
-- `go_memstats_last_gc_time_seconds`: Timestamp of the last garbage collection.
-
-### Goroutines & Threads
-
-- `go_goroutines`: Total goroutines running.
-- `go_threads`: OS threads created.
-- `go_sched_gomaxprocs_threads`: Current GOMAXPROCS value.
-
-### Memory Statistics
-
-- `go_memstats_alloc_bytes`: Live heap allocations (in use).
-- `go_memstats_alloc_bytes_total`: Total heap allocated since start.
-- `go_memstats_buck_hash_sys_bytes`: Bytes used by profiling bucket hash table.
-- `go_memstats_frees_total`: Total number of heap frees.
-- `go_memstats_gc_sys_bytes`: Bytes used for GC metadata.
-- `go_memstats_heap_alloc_bytes`
-- `go_memstats_heap_idle_bytes`
-- `go_memstats_heap_inuse_bytes`
-- `go_memstats_heap_objects`
-- `go_memstats_heap_released_bytes`
-- `go_memstats_heap_sys_bytes`
-- `go_memstats_mallocs_total`: Total number of heap mallocs.
-- `go_memstats_mcache_inuse_bytes`
-- `go_memstats_mcache_sys_bytes`
-- `go_memstats_mspan_inuse_bytes`
-- `go_memstats_mspan_sys_bytes`
-- `go_memstats_next_gc_bytes`
-- `go_memstats_other_sys_bytes`
-- `go_memstats_stack_inuse_bytes`
-- `go_memstats_stack_sys_bytes`
-- `go_memstats_sys_bytes`
-
-These are standard runtime metrics useful for detecting memory leaks, GC pressure, and capacity limits.
-
-### Go Info
-
-- `go_info{version="go1.23.12"}`: Go runtime version info (labels may vary).
+A health-based alert is also useful, for example a small exporter or a blackbox probe on `/health` that fires on `status` other than `healthy`. Remember that `warning` can be legitimate (for example during a ban).
 
 ---
 
-## 3.2 Process Metrics
+## 6. Centralized push to the Foundation Grafana Cloud (Alloy)
 
-### CPU & Memory
+The release `docker-compose.yaml` defines an `alloy` service under the `monitoring` profile that pushes metrics and logs to a Grafana Cloud tenant. All six `CENTRAL_*` values are required (Alloy refuses to start with any missing), get them from the Foundation team in the `#bradbury` channel:
 
-- `process_cpu_seconds_total`: Total CPU time consumed.
-- `process_resident_memory_bytes`: RAM usage (RSS).
-- `process_virtual_memory_bytes`: Virtual memory usage.
-- `process_virtual_memory_max_bytes`: Maximum addressable virtual memory.
+```env
+CENTRAL_MONITORING_URL=
+CENTRAL_LOKI_URL=
+CENTRAL_MONITORING_USERNAME=
+CENTRAL_MONITORING_PASSWORD=
+CENTRAL_LOKI_USERNAME=
+CENTRAL_LOKI_PASSWORD=
 
-### File Descriptors
-
-- `process_open_fds`: Open file descriptors.
-- `process_max_fds`: Maximum allowed descriptors.
-
-### Network IO
-
-- `process_network_receive_bytes_total`: Bytes received by the process over the network.
-- `process_network_transmit_bytes_total`: Bytes sent by the process over the network.
-
-These metrics help track load patterns, resource usage, and network behavior of the validator process.
-
-### Process Start Time
-
-- `process_start_time_seconds`: Start time since Unix epoch — useful to detect restarts.
-
----
-
-## 3.3 Prometheus Handler Metrics
-
-Used internally by the Prometheus HTTP handler:
-
-- `promhttp_metric_handler_requests_in_flight`
-- `promhttp_metric_handler_requests_total{code="200"}`
-- `promhttp_metric_handler_requests_total{code="500"}`
-- `promhttp_metric_handler_requests_total{code="503"}`
-
----
-
-## 4. What Is Missing (Validator-Specific Metrics)
-
-Although useful, the built-in metrics do **NOT** cover validator-critical information such as:
-
-| Needed Metric | Available? | Notes |
-|---------------|------------|-------|
-| Are we signing consensus events? | ❌ | Not exposed. |
-| Self stake / total stake | ❌ | Only available via CLI (`validator-info`). |
-| Epoch number | ❌ | Available via CLI (`epoch-info`). |
-| Live / banned / quarantined status | ❌ | CLI only. |
-| Pending deposits or withdrawals | ❌ | CLI only. |
-| Activation epoch countdown | ❌ | CLI only. |
-| Needs priming | ❌ | CLI only (when present). |
-
-This means a professional monitoring setup requires an **external exporter**, which polls the CLI and exposes Prometheus metrics.
-
----
-
-## 5. Recommendations for Monitoring
-
-### 5.1 Essential Infra Metrics (Already Available)
-
-| Purpose | Metric |
-|---------|--------|
-| Detect node crash / restart | `process_start_time_seconds` |
-| Memory leak / heap growth | `go_memstats_alloc_bytes`, `go_memstats_heap_alloc_bytes` |
-| CPU overload | `process_cpu_seconds_total` |
-| Network stall | `process_network_receive_bytes_total`, `process_network_transmit_bytes_total` |
-| FD exhaustion | `process_open_fds / process_max_fds` |
-| Prometheus scrape issues | `promhttp_metric_handler_requests_total{code!="200"}` |
-
-### 5.2 Essential Health Signals (From `/health`, via exporter)
-
-| Purpose | Suggested Metric |
-|---------|------------------|
-| Global health | `genlayer_health_up` |
-| Validator loop health | `genlayer_validating_up` |
-| zkSync RPC connectivity | `genlayer_zksync_rpc_up` |
-| zkSync WS connectivity | `genlayer_zksync_ws_up` |
-| Version tracking | `genlayer_node_version_info`, `genlayer_genvm_version_info`, `genlayer_protocol_version_info` |
-
----
-
-## 6. Essential Validator Logic (Must Be Added Externally)
-
-Suggested custom metrics your exporter should provide:
-
-```text
-genlayer_epoch_current
-genlayer_epoch_time_until_next_seconds
-
-genlayer_validator_stake_current
-genlayer_validator_in_active_set
-genlayer_validator_live
-genlayer_validator_banned
-genlayer_validator_needs_priming
-
-genlayer_validator_epochs_remaining_for_activation
-genlayer_validator_pending_deposits
-genlayer_validator_pending_withdrawals
+NODE_ID=<validator wallet address>
+VALIDATOR_NAME=<moniker>
+NETWORK_NAME=bradbury-phase2
+NODE_METRICS_ENDPOINT=host.docker.internal:9153
+LOG_FILE_PATTERN=/var/log/genlayer/node*.log
+NODE_LOGS_PATH=./data/node/logs
 ```
 
----
+Start it together with the node:
 
-## 7. Summary
+```bash
+docker compose --profile node --profile monitoring up -d
+```
 
-GenLayer exposes **excellent infra metrics**, but **no validator-state metrics**.
+Verify:
 
-To monitor the node professionally:
+- Alloy UI: `http://localhost:12345/targets`, the node target must be **UP**.
+- `docker logs genlayer-node-alloy` has no 401, 403 or 500.
+- In Grafana Cloud, query `genlayer_node_uptime_seconds{instance="<NODE_ID>"}`.
+- Public dashboard: [GenLayer Foundation](https://genlayerfoundation.grafana.net/public-dashboards/66a372d856ea44e78cf9ac21a344f792).
 
-1. **Scrape `/metrics`** for infra.
-2. **Scrape `/health`** for high-level node status (convert JSON → Prometheus).
-3. **Build a Staking Exporter** for:
-   - Validator stake
-   - Epoch info
-   - Activation countdown
-   - Quarantine/banning/live status
-   - Pending deposits/withdrawals
+Common problems: URLs with a trailing slash, wrong credentials (401/403), ops port not reachable from the Alloy container.
 
 ---
 
-_Last updated: 2026-01-02 (Node v0.4.2, GenVM v0.2.7, Protocol v0.4:1dd08066)_
+## 7. Container health
+
+The WebDriver and Alloy containers have health checks and restart themselves when a check keeps failing:
+
+```bash
+docker inspect --format '{{.State.Health.Status}}' genlayer-node-webdriver
+docker inspect --format '{{.State.Health.Status}}' genlayer-node-alloy
+docker compose logs --since 30m webdriver-container alloy
+```
+
+Set `HEALTHCHECK_AUTO_RESTART=false` in `.env` to keep the checks but turn off the automatic restarts.
+
+---
+
+## 8. How Cumulo uses it
+
+The [Dashboard](index) of this explorer reads `/health`, `/metrics` and `/balance` of our node and shows: sync and block lag, uptime, CPU, memory, disk, the health conditions with their reason and action text, operator balance, and consensus submission outcomes. Stake and ranking come from the official explorer API.
